@@ -1,0 +1,152 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Template API Gateway Pub Vanilla
+
+Parameters:
+  Env:
+    Type: String
+    Description: The environment 
+  Service:
+    Type: String
+  Squad:
+    Type: String
+  Slack:
+    Type: String
+  Email:
+    Type: String
+  DomainName:
+    Type: String
+  HostedZoneId:
+    Type: String
+  RegionalCertificateArn:
+    Type: String
+    Default: NoValue
+  EdgeCertificateArn:
+    Type: String
+    Default: NoValue    
+  EndpointType:
+    Type: String
+    Default: REGIONAL
+    AllowedValues:
+      - REGIONAL
+      - EDGE
+
+  TLSVersion:
+    Type: String
+    Default: TLS_1_2
+    AllowedValues:
+      - TLS_1_0
+      - TLS_1_2
+
+Conditions:
+  isRegionalEndpointType: !Equals [!Ref EndpointType, REGIONAL]
+  isEdgeEndpointType: !Equals [!Ref EndpointType, EDGE]
+
+Resources: 
+
+  RegionalCustomDomainName:
+    Condition: isRegionalEndpointType
+    Type: 'AWS::ApiGateway::DomainName'
+    Properties:
+      DomainName: !Ref DomainName
+      EndpointConfiguration:
+        Types:
+          - !Ref EndpointType
+      SecurityPolicy: !Ref TLSVersion
+      RegionalCertificateArn: !Ref RegionalCertificateArn   
+      Tags:
+        - 
+          Key: env
+          Value: !Ref Env
+        - 
+          Key: service
+          Value: !Ref Service
+        - 
+          Key: squad
+          Value: !Ref Squad
+        - 
+          Key: stack
+          Value: !Sub ${AWS::StackName}
+        - 
+          Key: slack
+          Value: !Ref Slack
+        - 
+          Key: email
+          Value: !Ref Email
+        - 
+          Key: resource
+          Value: custom-domain-name
+
+  RegionalRecordSet:
+    Condition: isRegionalEndpointType
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      AliasTarget:
+        HostedZoneId: !GetAtt [RegionalCustomDomainName, RegionalHostedZoneId]
+        DNSName: !GetAtt [RegionalCustomDomainName, RegionalDomainName]  
+
+  EdgeCustomDomainName:
+    Condition: isEdgeEndpointType
+    Type: 'AWS::ApiGateway::DomainName'
+    Properties:
+      DomainName: !Ref DomainName
+      EndpointConfiguration:
+        Types:
+          - !Ref EndpointType
+      SecurityPolicy: !Ref TLSVersion
+      CertificateArn: !Ref EdgeCertificateArn      
+      Tags:
+        - 
+          Key: env
+          Value: !Ref Env
+        - 
+          Key: service
+          Value: !Ref Service
+        - 
+          Key: squad
+          Value: !Ref Squad
+        - 
+          Key: stack
+          Value: !Sub ${AWS::StackName}
+        - 
+          Key: slack
+          Value: !Ref Slack
+        - 
+          Key: email
+          Value: !Ref Email
+        - 
+          Key: resource
+          Value: custom-domain-name
+
+  EdgeRecordSet:
+    Condition: isEdgeEndpointType
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Type: A
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      AliasTarget:
+        HostedZoneId: !GetAtt [EdgeCustomDomainName, DistributionHostedZoneId]
+        DNSName: !GetAtt [EdgeCustomDomainName, DistributionDomainName]            
+
+Outputs:
+  RegionalURL:
+    Condition: isRegionalEndpointType
+    Value: !Ref RegionalCustomDomainName
+    Export:
+      Name:
+        !Join
+          - ':'
+          - - domainame
+            - !Select [0, !Split [".", !Ref DomainName ] ]
+  EdgeURL:
+    Condition: isEdgeEndpointType
+    Value: !Ref EdgeCustomDomainName
+    Export:
+      Name:
+        !Join
+          - ':'
+          - - domainame
+            - !Select [0, !Split [".", !Ref DomainName ] ]

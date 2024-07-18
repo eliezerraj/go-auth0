@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-auth0/internal/lib"
@@ -14,14 +15,14 @@ import (
 var childLogger = log.With().Str("service", "service").Logger()
 
 type WorkerService struct {
-	jwtKey	*[]byte
+	jwtKey	[]byte
 }
 
 func NewWorkerService(jwtKey []byte) *WorkerService{
 	childLogger.Debug().Msg("NewWorkerService")
 
 	return &WorkerService{
-		jwtKey: &jwtKey,
+		jwtKey: jwtKey,
 	}
 }
 
@@ -41,6 +42,7 @@ func (w WorkerService) TokenValidation(ctx context.Context, credential core.Cred
 	})
 
 	if err != nil {
+		fmt.Println(err)
 		if err == jwt.ErrSignatureInvalid {
 			return false, erro.ErrStatusUnauthorized
 		}

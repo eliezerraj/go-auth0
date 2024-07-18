@@ -38,6 +38,9 @@ func main() {
 	defer cancel()
 
 	var jwtKey = "my-secret-key"
+
+	log.Debug().Str("======== > jwtKey", jwtKey).Msg("")
+	
 	workerService := service.NewWorkerService([]byte(jwtKey))
 	
 	httpWorkerAdapter 	:= handler.NewHttpWorkerAdapter(workerService)

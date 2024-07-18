@@ -89,6 +89,11 @@ func (h HttpServer) StartHttpAppServer(	ctx context.Context,
 						http.HandlerFunc(httpWorkerAdapter.TokenValidation),)
 	validToken.Use(otelmux.Middleware("go-auth0"))
 
+	validateToken := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	validateToken.Handle("/validate",
+						http.HandlerFunc(httpWorkerAdapter.Validation),)
+	validateToken.Use(otelmux.Middleware("go-auth0"))
+
 	srv := http.Server{
 		Addr:         ":" +  strconv.Itoa(h.httpServer.Port),      	
 		Handler:      myRouter,                	          
