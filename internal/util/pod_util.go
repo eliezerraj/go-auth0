@@ -63,7 +63,7 @@ func GetInfoPod() (core.InfoPod,core.Server) {
 	infoPod.OSPID = strconv.Itoa(os.Getpid())
 
 	// Get AZ only if localtest is true
-	if (infoPod.IsAZ == true) {
+	if (infoPod.IsAZ) {
 		cfg, err := config.LoadDefaultConfig(context.TODO())
 		if err != nil {
 			childLogger.Error().Err(err).Msg("ERRO FATAL get Context !!!")

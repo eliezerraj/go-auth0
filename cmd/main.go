@@ -8,8 +8,12 @@ import(
 
 	"github.com/go-auth0/internal/util"
 	"github.com/go-auth0/internal/handler"
+	"github.com/go-auth0/internal/handler/controller"
 	"github.com/go-auth0/internal/core"
 	"github.com/go-auth0/internal/service"
+	"github.com/go-auth0/internal/config/parameter_store_aws"
+	"github.com/go-auth0/internal/config/secret_manager_aws"
+	"github.com/go-auth0/internal/repository/dynamo"
 )
 
 var(
@@ -23,10 +27,14 @@ func init(){
 
 	infoPod, server := util.GetInfoPod()
 	configOTEL := util.GetOtelEnv()
+	dynamo := util.GetDynamoEnv()
+	keys := util.LoadRSAKey()
 
 	appServer.InfoPod = &infoPod
 	appServer.Server = &server
+	appServer.DynamoConfig = &dynamo
 	appServer.ConfigOTEL = &configOTEL
+	appServer.RSA_Key = keys
 }
 
 func main() {
@@ -37,13 +45,33 @@ func main() {
 										time.Duration( appServer.Server.ReadTimeout ) * time.Second)
 	defer cancel()
 
-	var jwtKey = "my-secret-key"
+	dynamoRepository, err := dynamo.NewDynamoRepository(ctx, *appServer.DynamoConfig)
+	if err != nil {
+		log.Error().Err(err).Msg("erro NewDynamoRepository")
+	}
 
+	clientSsm, err := parameter_store_aws.NewClientParameterStore(ctx, *appServer.DynamoConfig)
+	if err != nil {
+		log.Error().Err(err).Msg("erro NewClientParameterStore")
+	}
+	
+	clientSecretManager, err := secret_manager_aws.NewClientSecretManager(ctx, *appServer.DynamoConfig)
+	if err != nil {
+		log.Error().Err(err).Msg("erro NewClientSecretManager")
+	}
+
+	var jwtKey = "my-secret-key"
 	log.Debug().Str("======== > jwtKey", jwtKey).Msg("")
 	
-	workerService := service.NewWorkerService([]byte(jwtKey))
+	appServer.RSA_Key.HS256 = []byte(jwtKey)
+
+	workerService := service.NewWorkerService(	clientSecretManager, 
+												clientSsm, 
+												dynamoRepository,
+												appServer.RSA_Key,
+											)
 	
-	httpWorkerAdapter 	:= handler.NewHttpWorkerAdapter(workerService)
+	httpWorkerAdapter 	:= controller.NewHttpWorkerAdapter(workerService)
 	httpServer 			:= handler.NewHttpAppServer(appServer.Server)
 
 	httpServer.StartHttpAppServer(ctx, &httpWorkerAdapter, &appServer)

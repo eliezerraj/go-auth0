@@ -11,31 +11,19 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
-
 	"github.com/gorilla/mux"
 
 	"github.com/go-auth0/internal/lib"
-	"github.com/go-auth0/internal/service"
 	"github.com/go-auth0/internal/core"
+	"github.com/go-auth0/internal/handler/controller"
+	"github.com/go-auth0/internal/handler/middleware"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/contrib/propagators/aws/xray"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 )
 
-var childLogger = log.With().Str("handler", "handler").Logger()
-
-type HttpWorkerAdapter struct {
-	workerService 	*service.WorkerService
-}
-
-func NewHttpWorkerAdapter(workerService *service.WorkerService) HttpWorkerAdapter {
-	childLogger.Debug().Msg("NewHttpWorkerAdapter")
-
-	return HttpWorkerAdapter{
-		workerService: workerService,
-	}
-}
+var childLogger = log.With().Str("handler", "server").Logger()
 
 type HttpServer struct {
 	httpServer	*core.Server
@@ -48,7 +36,7 @@ func NewHttpAppServer(httpServer *core.Server) HttpServer {
 }
 
 func (h HttpServer) StartHttpAppServer(	ctx context.Context, 
-										httpWorkerAdapter *HttpWorkerAdapter,
+										httpWorkerAdapter *controller.HttpWorkerAdapter,
 										appServer *core.AppServer) {
 	childLogger.Info().Msg("StartHttpAppServer")
 	// ---------------------- OTEL ---------------
@@ -65,7 +53,7 @@ func (h HttpServer) StartHttpAppServer(	ctx context.Context,
 	otel.SetTracerProvider(tp)
 
 	myRouter := mux.NewRouter().StrictSlash(true)
-	myRouter.Use(MiddleWareHandlerHeader)
+	myRouter.Use(middleware.MiddleWareHandlerHeader)
 
 	myRouter.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
 		childLogger.Debug().Msg("/")
@@ -85,15 +73,30 @@ func (h HttpServer) StartHttpAppServer(	ctx context.Context,
     live.HandleFunc("/live", httpWorkerAdapter.Live)
 
 	validToken := myRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
-	validToken.Handle("/tokenValidation/{id}",
-						http.HandlerFunc(httpWorkerAdapter.TokenValidation),)
+	validToken.Handle("/tokenValidation/{id}",middleware.MiddleWareErrorHandler(httpWorkerAdapter.TokenValidation),)
 	validToken.Use(otelmux.Middleware("go-auth0"))
 
 	validateToken := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
-	validateToken.Handle("/validate",
-						http.HandlerFunc(httpWorkerAdapter.Validation),)
+	validateToken.Handle("/validate",middleware.MiddleWareErrorHandler(httpWorkerAdapter.Validation),)
 	validateToken.Use(otelmux.Middleware("go-auth0"))
 
+	oauthCredential := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	oauthCredential.Handle("/oauth_credential",middleware.MiddleWareErrorHandler(httpWorkerAdapter.OAUTHCredential),)
+	oauthCredential.Use(otelmux.Middleware("go-auth0"))
+
+	oauthCredentialRSA := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	oauthCredentialRSA.Handle("/oauth_credential_rsa",middleware.MiddleWareErrorHandler(httpWorkerAdapter.OAUTHCredentialRSA),)
+	oauthCredentialRSA.Use(otelmux.Middleware("go-auth0"))
+
+	validateTokenRSA := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	validateTokenRSA.Handle("/validate_rsa",middleware.MiddleWareErrorHandler(httpWorkerAdapter.TokenValidationRSA),)
+	validateTokenRSA.Use(otelmux.Middleware("go-auth0"))
+
+	wellKnown := myRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	wellKnown.Handle("/wellKnown/{id}",middleware.MiddleWareErrorHandler(httpWorkerAdapter.WellKnown),)
+	wellKnown.Use(otelmux.Middleware("go-auth0"))
+
+	// ---------------
 	srv := http.Server{
 		Addr:         ":" +  strconv.Itoa(h.httpServer.Port),      	
 		Handler:      myRouter,                	          
@@ -101,6 +104,8 @@ func (h HttpServer) StartHttpAppServer(	ctx context.Context,
 		WriteTimeout: time.Duration(h.httpServer.WriteTimeout) * time.Second,  
 		IdleTimeout:  time.Duration(h.httpServer.IdleTimeout) * time.Second,
 	}
+
+	childLogger.Info().Str("Service Port : ", strconv.Itoa(h.httpServer.Port)).Msg("Service Port")
 
 	go func() {
 		err := srv.ListenAndServe()
