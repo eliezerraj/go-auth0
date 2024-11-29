@@ -79,11 +79,12 @@ type JwtData struct {
 }
 
 type DatabaseDynamo struct {
-	UserTableName		string `json:"order_table"`
+	UserTableName		string `json:"user_login_table"`
 	AwsRegion			string	`json:"aws_region"`
 }
 
 type RSA_Key struct{
+	SecretNameH256		string 	`json:"secret_name_h256"`
 	RSAPublicKey		string 	`json:"rsa_public_key"`
 	RSAPublicKeyByte 	[]byte 	`json:"rsa_public_key_byte"`
 	RSAPrivateKey		string 	`json:"rsa_private_key"`

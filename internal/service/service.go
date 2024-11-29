@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog/log"
+	"encoding/json"
 	"time"
 	"encoding/base64"
     "encoding/pem"
 	"crypto/rsa"
 	"crypto/x509"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
@@ -20,10 +22,6 @@ import (
 	"github.com/go-auth0/internal/config/secret_manager_aws"
 	"github.com/go-auth0/internal/repository/dynamo"
 
-	//"github.com/aws/aws-sdk-go-v2/service/ssm"
-	//"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-
-	//"github.com/golang-jwt/jwt/v4"
 )
 
 var childLogger = log.With().Str("service", "service").Logger()
@@ -35,18 +33,31 @@ type WorkerService struct {
 	RSA_Key					*core.RSA_Key
 }
 
-func NewWorkerService(	awsClientSecretManager *secret_manager_aws.AwsClientSecretManager, 
+func NewWorkerService(	ctx context.Context,
+						awsClientSecretManager *secret_manager_aws.AwsClientSecretManager, 
 						awsClientParameterStore *parameter_store_aws.AwsClientParameterStore,
 						workerDynamo	*dynamo.DynamoRepository,
-						rsaKey			*core.RSA_Key ) *WorkerService{
+						rsaKey			*core.RSA_Key ) (*WorkerService, error){
 	childLogger.Debug().Msg("NewWorkerService")
+
+	res_secret, err := awsClientSecretManager.GetSecret(ctx, rsaKey.SecretNameH256)
+	if err != nil {
+		return nil, err
+	}
+
+	var secretData map[string]string
+	if err := json.Unmarshal([]byte(*res_secret), &secretData); err != nil {
+		return nil, fmt.Errorf("failed to parse secret JSON: %w", err)
+	}
+
+	rsaKey.HS256 = []byte(secretData["secret-value-h256"])
 
 	return &WorkerService{
 		AwsClientSecretManager: awsClientSecretManager,
 		AwsClientParameterStore: awsClientParameterStore,
 		workerDynamo: 	workerDynamo,
 		RSA_Key: rsaKey,
-	}
+	}, nil
 }
 
 func (a WorkerService) OAUTHCredential(ctx context.Context, credential core.Credential) (*core.Authentication, error){

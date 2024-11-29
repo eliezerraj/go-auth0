@@ -7,10 +7,12 @@ metadata:
     app: *app-name
 data:
   API_VERSION: "1.0"
-  POD_NAME: "go-auth0.k8"
+  POD_NAME: "go-auth0.k8-v.2.0"
   PORT: "5100"
   SETPOD_AZ: "false"
-  JWT_KEY: "my_secret_key"
-  SSM_JWT_KEY: "key-secret"
+  USER_TABLE_NAME: user_login_2
+  #JWT_KEY: "my_secret_key"
+  #SSM_JWT_KEY: "key-secret"
   OTEL_EXPORTER_OTLP_ENDPOINT: "arch-eks-02-xray-collector.default.svc.cluster.local:4317"
   ENV: "dev"
+  SECRET_NAME_H256: "key_jwt_sa"

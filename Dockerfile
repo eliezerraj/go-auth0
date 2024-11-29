@@ -16,5 +16,7 @@ FROM alpine
 WORKDIR /app
 COPY --from=builder /app/cmd/go-auth0 .
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /app/cmd/vault/private_key.pem /app/cmd/vault/
+COPY --from=builder /app/cmd/vault/public_key.pem /app/cmd/vault/
 
 CMD ["/app/go-auth0"]

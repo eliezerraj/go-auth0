@@ -60,17 +60,17 @@ func main() {
 		log.Error().Err(err).Msg("erro NewClientSecretManager")
 	}
 
-	var jwtKey = "my-secret-key"
-	log.Debug().Str("======== > jwtKey", jwtKey).Msg("")
-	
-	appServer.RSA_Key.HS256 = []byte(jwtKey)
-
-	workerService := service.NewWorkerService(	clientSecretManager, 
+	workerService, err := service.NewWorkerService(	ctx,
+												clientSecretManager, 
 												clientSsm, 
 												dynamoRepository,
 												appServer.RSA_Key,
 											)
-	
+	if err != nil {
+		log.Error().Err(err).Msg("erro NewWorkerService")
+		panic(err)
+	}
+
 	httpWorkerAdapter 	:= controller.NewHttpWorkerAdapter(workerService)
 	httpServer 			:= handler.NewHttpAppServer(appServer.Server)
 
