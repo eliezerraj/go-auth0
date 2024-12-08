@@ -1,4 +1,4 @@
-package config_aws
+package configs
 
 import (
 	"context"

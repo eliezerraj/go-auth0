@@ -11,21 +11,19 @@ import(
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/config"
 
-	"github.com/go-auth0/internal/core"
+	"github.com/go-auth0/internal/model"
 )
 
-var childLogger = log.With().Str("util", "util").Logger()
-
-func GetInfoPod() (core.InfoPod,core.Server) {
-	childLogger.Debug().Msg("GetInfoPod")
+func GetInfoPod() (model.InfoPod, model.Server) {
+	log.Debug().Msg("GetInfoPod")
 
 	err := godotenv.Load(".env")
 	if err != nil {
-		childLogger.Info().Err(err).Msg("No .env File !!!!")
+		log.Info().Err(err).Msg("No .env File !!!!")
 	}
 
-	var infoPod 	core.InfoPod
-	var server		core.Server
+	var infoPod 	model.InfoPod
+	var server		model.Server
 	
 	server.ReadTimeout = 60
 	server.WriteTimeout = 60
@@ -50,7 +48,7 @@ func GetInfoPod() (core.InfoPod,core.Server) {
 	// Get IP
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		childLogger.Error().Err(err).Msg("Error to get the POD IP address !!!")
+		log.Error().Err(err).Msg("Error to get the POD IP address !!!")
 		os.Exit(3)
 	}
 	for _, a := range addrs {
@@ -66,13 +64,13 @@ func GetInfoPod() (core.InfoPod,core.Server) {
 	if (infoPod.IsAZ) {
 		cfg, err := config.LoadDefaultConfig(context.TODO())
 		if err != nil {
-			childLogger.Error().Err(err).Msg("ERRO FATAL get Context !!!")
+			log.Error().Err(err).Msg("ERRO FATAL get Context !!!")
 			os.Exit(3)
 		}
 		client := imds.NewFromConfig(cfg)
 		response, err := client.GetInstanceIdentityDocument(context.TODO(), &imds.GetInstanceIdentityDocumentInput{})
 		if err != nil {
-			childLogger.Error().Err(err).Msg("Unable to retrieve the region from the EC2 instance !!!")
+			log.Error().Err(err).Msg("Unable to retrieve the region from the EC2 instance !!!")
 			os.Exit(3)
 		}
 		infoPod.AvailabilityZone = response.AvailabilityZone	

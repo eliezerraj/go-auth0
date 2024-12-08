@@ -6,19 +6,20 @@ import(
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/go-auth0/internal/util"
-	"github.com/go-auth0/internal/handler"
-	"github.com/go-auth0/internal/handler/controller"
-	"github.com/go-auth0/internal/core"
-	"github.com/go-auth0/internal/service"
-	"github.com/go-auth0/internal/config/parameter_store_aws"
-	"github.com/go-auth0/internal/config/secret_manager_aws"
-	"github.com/go-auth0/internal/repository/dynamo"
+	"github.com/go-auth0/pkg/util"
+	"github.com/go-auth0/configs"
+	"github.com/go-auth0/internal/usecase/jwt/adapter/controller"
+	"github.com/go-auth0/internal/usecase/jwt"
+	"github.com/go-auth0/internal/usecase/jwt/repository"
+	"github.com/go-auth0/internal/model"
+	"github.com/go-auth0/pkg/api/server"
+	"github.com/go-auth0/pkg/aws_secret_manager"
+	database "github.com/go-auth0/pkg/database/dynamo"
 )
 
 var(
-	logLevel 	= 	zerolog.DebugLevel
-	appServer	core.AppServer
+	logLevel = zerolog.DebugLevel
+	appServer	model.AppServer
 )
 
 func init(){
@@ -45,34 +46,34 @@ func main() {
 										time.Duration( appServer.Server.ReadTimeout ) * time.Second)
 	defer cancel()
 
-	dynamoRepository, err := dynamo.NewDynamoRepository(ctx, *appServer.DynamoConfig)
+	configAWS, err := configs.GetAWSConfig(ctx, appServer.InfoPod.AWSRegion)
+	if err != nil {
+		panic("configuration error create new aws session " + err.Error())
+	}
+
+	database, err := database.NewDatabase(ctx, configAWS)
 	if err != nil {
 		log.Error().Err(err).Msg("erro NewDynamoRepository")
 	}
 
-	clientSsm, err := parameter_store_aws.NewClientParameterStore(ctx, *appServer.DynamoConfig)
-	if err != nil {
-		log.Error().Err(err).Msg("erro NewClientParameterStore")
-	}
-	
-	clientSecretManager, err := secret_manager_aws.NewClientSecretManager(ctx, *appServer.DynamoConfig)
+	clientSecretManager, err := aws_secret_manager.NewClientSecretManager(configAWS)
 	if err != nil {
 		log.Error().Err(err).Msg("erro NewClientSecretManager")
 	}
 
-	workerService, err := service.NewWorkerService(	ctx,
-												clientSecretManager, 
-												clientSsm, 
-												dynamoRepository,
-												appServer.RSA_Key,
-											)
+	repoWorker:= repository.NewRepoWorker(database, &appServer.DynamoConfig.UserTableName)
+
+	usecase, err := jwt.NewWorkerService(ctx,
+										clientSecretManager, 
+										repoWorker,
+										appServer.RSA_Key)
 	if err != nil {
 		log.Error().Err(err).Msg("erro NewWorkerService")
 		panic(err)
 	}
 
-	httpWorkerAdapter 	:= controller.NewHttpWorkerAdapter(workerService)
-	httpServer 			:= handler.NewHttpAppServer(appServer.Server)
+	httpWorkerAdapter 	:= controller.NewHttpWorkerAdapter(usecase)
+	httpServer 			:= server.NewHttpAppServer(appServer.Server)
 
 	httpServer.StartHttpAppServer(ctx, &httpWorkerAdapter, &appServer)
 }

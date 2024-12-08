@@ -2,19 +2,21 @@ package util
 
 import(
 	"os"
+
+	"github.com/rs/zerolog/log"	
 	"github.com/joho/godotenv"
-	"github.com/go-auth0/internal/core"
+	"github.com/go-auth0/internal/model"
 )
 
-func GetOtelEnv() core.ConfigOTEL {
-	childLogger.Debug().Msg("GetOtelEnv")
+func GetOtelEnv() model.ConfigOTEL {
+	log.Debug().Msg("GetOtelEnv")
 
 	err := godotenv.Load(".env")
 	if err != nil {
-		childLogger.Info().Err(err).Msg("No .env File !!!!")
+		log.Info().Err(err).Msg("No .env File !!!!")
 	}
 
-	var configOTEL	core.ConfigOTEL
+	var configOTEL	model.ConfigOTEL
 
 	configOTEL.TimeInterval = 1
 	configOTEL.TimeAliveIncrementer = 1

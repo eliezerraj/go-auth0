@@ -15,4 +15,4 @@ data:
   #SSM_JWT_KEY: "key-secret"
   OTEL_EXPORTER_OTLP_ENDPOINT: "arch-eks-02-xray-collector.default.svc.cluster.local:4317"
   ENV: "dev"
-  SECRET_NAME_H256: "key_jwt_sa"
+  SECRET_NAME_H256: "key-jwt-auth"

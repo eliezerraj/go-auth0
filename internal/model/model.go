@@ -1,4 +1,4 @@
-package core
+package model
 
 import(
 	"time"
@@ -18,6 +18,7 @@ type AppServer struct {
 type InfoPod struct {
 	PodName				string `json:"pod_name"`
 	ApiVersion			string `json:"version"`
+	AWSRegion			string `json:"aws_region,omitempty"`
 	OSPID				string `json:"os_pid"`
 	IPAddress			string `json:"ip_address"`
 	AvailabilityZone 	string `json:"availabilityZone"`
@@ -84,13 +85,12 @@ type DatabaseDynamo struct {
 }
 
 type RSA_Key struct{
-	SecretNameH256		string 	`json:"secret_name_h256"`
-	RSAPublicKey		string 	`json:"rsa_public_key"`
-	RSAPublicKeyByte 	[]byte 	`json:"rsa_public_key_byte"`
-	RSAPrivateKey		string 	`json:"rsa_private_key"`
-	RSAPrivateKeyByte 	[]byte 	`json:"rsa_private_key_byte"`
-	PrivateKeyPem		*rsa.PrivateKey
-	HS256				[]byte 	`json:"h256_key_byte"`		
+	SecretNameH256		string
+	JwtKey				string
+	Key_rsa_priv_pem	string
+	Key_rsa_pub_pem 	string	
+	Key_rsa_priv 		*rsa.PrivateKey
+	Key_rsa_pub 		*rsa.PublicKey	
 }
 
 type Jwks struct{

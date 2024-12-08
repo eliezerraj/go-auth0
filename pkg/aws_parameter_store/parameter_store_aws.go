@@ -1,42 +1,36 @@
-package parameter_store_aws
+package aws_parameter_store
 
 import (
 	"context"
 
 	"github.com/rs/zerolog/log"
-
-	"github.com/go-auth0/internal/lib"
-	"github.com/go-auth0/internal/core"
-	"github.com/go-auth0/internal/config/config_aws"
+	"github.com/go-auth0/pkg/observability"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 )
 
-var childLogger = log.With().Str("repository", "AwsClientParameterStore").Logger()
+var childLogger = log.With().Str("pkg", "aws_parameter_store").Logger()
 
 type AwsClientParameterStore struct {
 	Client *ssm.Client
 }
 
-func NewClientParameterStore(ctx context.Context, databaseDynamo core.DatabaseDynamo) (*AwsClientParameterStore, error) {
+func NewClientParameterStore(configAWS *aws.Config) (*AwsClientParameterStore, error) {
 	childLogger.Debug().Msg("NewClientParameterStore")
 
-	span := lib.Span(ctx, "repository.NewClientParameterStore")	
-    defer span.End()
-
-	sdkConfig, err := config_aws.GetAWSConfig(ctx, databaseDynamo.AwsRegion)
-	if err != nil{
-		return nil, err
-	}
-
-	client := ssm.NewFromConfig(*sdkConfig)
+	client := ssm.NewFromConfig(*configAWS)
 	return &AwsClientParameterStore{
 		Client: client,
 	}, nil
 }
 
 func (p *AwsClientParameterStore) GetParameter(ctx context.Context, parameterName string) (*string, error) {
+	childLogger.Debug().Msg("GetSecret")
+
+	span := observability.Span(ctx, "aws_secret_manager.GetSecret")	
+    defer span.End()
+
 	result, err := p.Client.GetParameter(ctx, 
 										&ssm.GetParameterInput{
 											Name:	aws.String(parameterName),

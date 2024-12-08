@@ -1,52 +1,41 @@
-package dynamo
+package repository
 
 import(
 	"context"
 	"fmt"
-
-	"github.com/go-auth0/internal/lib"
-	"github.com/go-auth0/internal/erro"
-	"github.com/go-auth0/internal/core"
-	"github.com/go-auth0/internal/config/config_aws"
-
 	"github.com/rs/zerolog/log"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
+	database "github.com/go-auth0/pkg/database/dynamo"
+	"github.com/go-auth0/pkg/observability"
+	"github.com/go-auth0/internal/erro"
+	"github.com/go-auth0/internal/model"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 )
 
 var childLogger = log.With().Str("repository", "DynamoRepository").Logger()
 
-type DynamoRepository struct {
-	client 		*dynamodb.Client
-	tableName   *string
+type RepoWorker struct{
+	TableName   *string
+	Repository	*database.Database
 }
 
-func NewDynamoRepository(ctx context.Context, databaseDynamo core.DatabaseDynamo) (*DynamoRepository, error){
-	childLogger.Debug().Msg("NewDynamoRepository")
+func NewRepoWorker(	repository *database.Database,
+					tableName   *string) *RepoWorker{
+	childLogger.Debug().Msg("NewRepoCredential")
 
-	span := lib.Span(ctx, "repository.NewDynamoRepository")	
-    defer span.End()
-
-	sdkConfig, err :=config_aws.GetAWSConfig(ctx, databaseDynamo.AwsRegion)
-	if err != nil{
-		return nil, err
+	return &RepoWorker{
+		Repository: repository,
+		TableName: tableName,
 	}
-
-	client := dynamodb.NewFromConfig(*sdkConfig)
-
-	return &DynamoRepository {
-		client: client,
-		tableName: aws.String(databaseDynamo.UserTableName),
-	}, nil
 }
 
-func (r *DynamoRepository) Login(ctx context.Context, user_credential core.Credential) (*core.Credential, error){
+func (r *RepoWorker) Login(ctx context.Context, user_credential model.Credential) (*model.Credential, error){
 	childLogger.Debug().Msg("Login")
 
-	span := lib.Span(ctx, "repo.Login")	
+	span := observability.Span(ctx, "repo.Login")	
     defer span.End()
 
 	var keyCond expression.KeyConditionBuilder
@@ -65,19 +54,19 @@ func (r *DynamoRepository) Login(ctx context.Context, user_credential core.Crede
 		return nil, erro.ErrPreparedQuery
 	}
 
-	key := &dynamodb.QueryInput{	TableName:                 r.tableName,
+	key := &dynamodb.QueryInput{	TableName:                 r.TableName,
 									ExpressionAttributeNames:  expr.Names(),
 									ExpressionAttributeValues: expr.Values(),
 									KeyConditionExpression:    expr.KeyCondition(),
 	}
 
-	result, err := r.client.Query(ctx, key)
+	result, err := r.Repository.Client.Query(ctx, key)
 	if err != nil {
 		childLogger.Error().Err(err).Msg("error Query")
 		return nil, erro.ErrQuery
 	}
 
-	credential := []core.Credential{}
+	credential := []model.Credential{}
 	err = attributevalue.UnmarshalListOfMaps(result.Items, &credential)
     if err != nil {
 		childLogger.Error().Err(err).Msg("error UnmarshalListOfMaps")
@@ -91,10 +80,10 @@ func (r *DynamoRepository) Login(ctx context.Context, user_credential core.Crede
 	}
 }
 
-func (r *DynamoRepository) QueryCredentialScope(ctx context.Context, user_credential core.Credential) (*core.CredentialScope, error){
+func (r *RepoWorker) QueryCredentialScope(ctx context.Context, user_credential model.Credential) (*model.CredentialScope, error){
 	childLogger.Debug().Msg("QueryCredentialScope")
 
-	span := lib.Span(ctx, "repo.QueryCredentialScope")	
+	span := observability.Span(ctx, "repo.QueryCredentialScope")	
     defer span.End()
 
 	var keyCond expression.KeyConditionBuilder
@@ -114,26 +103,26 @@ func (r *DynamoRepository) QueryCredentialScope(ctx context.Context, user_creden
 		return nil, err
 	}
 
-	key := &dynamodb.QueryInput{TableName:                 r.tableName,
+	key := &dynamodb.QueryInput{TableName:                 r.TableName,
 								ExpressionAttributeNames:  expr.Names(),
 								ExpressionAttributeValues: expr.Values(),
 								KeyConditionExpression:    expr.KeyCondition(),
 							}
 
-	result, err := r.client.Query(ctx, key)
+	result, err := r.Repository.Client.Query(ctx, key)
 	if err != nil {
 		childLogger.Error().Err(err).Msg("error Query")
 		return nil, erro.ErrList
 	}
 
-	credential_scope_temp := []core.CredentialScope{}
+	credential_scope_temp := []model.CredentialScope{}
 	err = attributevalue.UnmarshalListOfMaps(result.Items, &credential_scope_temp)
     if err != nil {
 		childLogger.Error().Err(err).Msg("error UnmarshalListOfMaps")
 		return nil, erro.ErrUnmarshal
     }
 
-	credential_scope_result := core.CredentialScope{}
+	credential_scope_result := model.CredentialScope{}
 	for _, item := range credential_scope_temp{
 		credential_scope_result.ID = item.ID
 		credential_scope_result.SK = item.SK

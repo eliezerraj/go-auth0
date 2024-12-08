@@ -4,11 +4,10 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog/log"
-
-	"github.com/go-auth0/internal/handler/controller"
+	"github.com/go-auth0/internal/usecase/jwt/adapter/controller"
 )
 
-var childLogger = log.With().Str("handler", "middleware").Logger()
+var childLogger = log.With().Str("pkg", "middleware").Logger()
 
 // Middleware v01
 func MiddleWareHandlerHeader(next http.Handler) http.Handler {

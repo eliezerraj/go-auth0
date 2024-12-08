@@ -1,11 +1,11 @@
-package lib
+package observability
 
 import(
 	"context"
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/go-auth0/internal/core"
+	"github.com/go-auth0/internal/model"
     
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -17,7 +17,7 @@ import(
 	"go.opentelemetry.io/otel/sdk/resource"
 )
 
-var childLogger = log.With().Str("lib", "instrumentation").Logger()
+var authOption otlptracegrpc.Option
 
 func Event(span trace.Span, attributeSpan string) {
 	span.AddEvent("Executing SQL query", trace.WithAttributes(attribute.String("db.statement", attributeSpan)))
@@ -47,7 +47,7 @@ func Span(ctx context.Context, spanName string) trace.Span {
 	return span
 }
 
-func Attributes(ctx context.Context, InfoPod *core.InfoPod) []attribute.KeyValue {
+func Attributes(ctx context.Context, InfoPod *model.InfoPod) []attribute.KeyValue {
 	return []attribute.KeyValue{
 		attribute.String("service.name", InfoPod.PodName),
 		attribute.String("service.version", InfoPod.ApiVersion),
@@ -59,17 +59,16 @@ func Attributes(ctx context.Context, InfoPod *core.InfoPod) []attribute.KeyValue
 	}
 }
 
-func buildResources(ctx context.Context, infoPod *core.InfoPod) (*resource.Resource, error) {
+func buildResources(ctx context.Context, infoPod *model.InfoPod) (*resource.Resource, error) {
 	return resource.New(
 		ctx,
 		resource.WithAttributes(Attributes(ctx, infoPod)...),
 	)
 }
 
-func NewTracerProvider(ctx context.Context, configOTEL *core.ConfigOTEL, infoPod *core.InfoPod) *sdktrace.TracerProvider {
+func NewTracerProvider(ctx context.Context, configOTEL *model.ConfigOTEL, infoPod *model.InfoPod) *sdktrace.TracerProvider {
 	log.Debug().Msg("NewTracerProvider")
 
-	var authOption otlptracegrpc.Option
 	authOption = otlptracegrpc.WithInsecure()
 
 	exporter, err := otlptrace.New(

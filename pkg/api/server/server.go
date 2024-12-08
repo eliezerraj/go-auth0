@@ -1,4 +1,4 @@
-package handler
+package server
 
 import (
 	"time"
@@ -13,10 +13,11 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/gorilla/mux"
 
-	"github.com/go-auth0/internal/lib"
-	"github.com/go-auth0/internal/core"
-	"github.com/go-auth0/internal/handler/controller"
-	"github.com/go-auth0/internal/handler/middleware"
+	"github.com/go-auth0/pkg/observability"
+	"github.com/go-auth0/internal/model"
+	
+	"github.com/go-auth0/internal/usecase/jwt/adapter/controller"
+	"github.com/go-auth0/pkg/api/middleware"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/contrib/propagators/aws/xray"
@@ -26,23 +27,22 @@ import (
 var childLogger = log.With().Str("handler", "server").Logger()
 
 type HttpServer struct {
-	httpServer	*core.Server
+	httpServer	*model.Server
 }
 
-func NewHttpAppServer(httpServer *core.Server) HttpServer {
+func NewHttpAppServer(httpServer *model.Server) HttpServer {
 	childLogger.Debug().Msg("NewHttpAppServer")
-
 	return HttpServer{httpServer: httpServer }
 }
 
 func (h HttpServer) StartHttpAppServer(	ctx context.Context, 
 										httpWorkerAdapter *controller.HttpWorkerAdapter,
-										appServer *core.AppServer) {
+										appServer *model.AppServer) {
 	childLogger.Info().Msg("StartHttpAppServer")
 	// ---------------------- OTEL ---------------
 	childLogger.Info().Str("OTEL_EXPORTER_OTLP_ENDPOINT :", appServer.ConfigOTEL.OtelExportEndpoint).Msg("")
 	
-	tp := lib.NewTracerProvider(ctx, appServer.ConfigOTEL, appServer.InfoPod)
+	tp := observability.NewTracerProvider(ctx, appServer.ConfigOTEL, appServer.InfoPod)
 	defer func() { 
 		err := tp.Shutdown(ctx)
 		if err != nil{
@@ -72,6 +72,10 @@ func (h HttpServer) StartHttpAppServer(	ctx context.Context,
 	live := myRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
     live.HandleFunc("/live", httpWorkerAdapter.Live)
 
+	oauthCredential := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	oauthCredential.Handle("/oauth_credential",middleware.MiddleWareErrorHandler(httpWorkerAdapter.OAUTHCredential),)
+	oauthCredential.Use(otelmux.Middleware("go-auth0"))
+
 	validToken := myRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
 	validToken.Handle("/tokenValidation/{id}",middleware.MiddleWareErrorHandler(httpWorkerAdapter.TokenValidation),)
 	validToken.Use(otelmux.Middleware("go-auth0"))
@@ -80,21 +84,35 @@ func (h HttpServer) StartHttpAppServer(	ctx context.Context,
 	validateToken.Handle("/validate",middleware.MiddleWareErrorHandler(httpWorkerAdapter.Validation),)
 	validateToken.Use(otelmux.Middleware("go-auth0"))
 
-	oauthCredential := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
-	oauthCredential.Handle("/oauth_credential",middleware.MiddleWareErrorHandler(httpWorkerAdapter.OAUTHCredential),)
-	oauthCredential.Use(otelmux.Middleware("go-auth0"))
+	refreshToken := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	refreshToken.Handle("/refresh_token",middleware.MiddleWareErrorHandler(httpWorkerAdapter.RefreshToken),)
+	refreshToken.Use(otelmux.Middleware("go-auth0"))
+
+	//------------------------------
 
 	oauthCredentialRSA := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
 	oauthCredentialRSA.Handle("/oauth_credential_rsa",middleware.MiddleWareErrorHandler(httpWorkerAdapter.OAUTHCredentialRSA),)
 	oauthCredentialRSA.Use(otelmux.Middleware("go-auth0"))
 
-	validateTokenRSA := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
-	validateTokenRSA.Handle("/validate_rsa",middleware.MiddleWareErrorHandler(httpWorkerAdapter.TokenValidationRSA),)
-	validateTokenRSA.Use(otelmux.Middleware("go-auth0"))
-
 	wellKnown := myRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
 	wellKnown.Handle("/wellKnown/{id}",middleware.MiddleWareErrorHandler(httpWorkerAdapter.WellKnown),)
 	wellKnown.Use(otelmux.Middleware("go-auth0"))
+
+	validateTokenRSA := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	validateTokenRSA.Handle("/validate_rsa",middleware.MiddleWareErrorHandler(httpWorkerAdapter.ValidationRSA),)
+	validateTokenRSA.Use(otelmux.Middleware("go-auth0"))
+
+	validTokenRSA := myRouter.Methods(http.MethodGet, http.MethodOptions).Subrouter()
+	validTokenRSA.Handle("/tokenValidationRSA/{id}",middleware.MiddleWareErrorHandler(httpWorkerAdapter.TokenValidationRSA),)
+	validTokenRSA.Use(otelmux.Middleware("go-auth0"))
+
+	validationTokenAndPubKey := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	validationTokenAndPubKey.Handle("/validation_token_pubkey",middleware.MiddleWareErrorHandler(httpWorkerAdapter.ValidationTokenAndPubKey),)
+	validationTokenAndPubKey.Use(otelmux.Middleware("go-auth0"))
+
+	refreshTokenRSA := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	refreshTokenRSA.Handle("/refresh_token_rsa",middleware.MiddleWareErrorHandler(httpWorkerAdapter.RefreshTokenRSA),)
+	refreshTokenRSA.Use(otelmux.Middleware("go-auth0"))
 
 	// ---------------
 	srv := http.Server{

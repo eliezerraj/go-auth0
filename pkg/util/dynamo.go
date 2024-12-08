@@ -2,20 +2,21 @@ package util
 
 import(
 	"os"
-
+	
+	"github.com/rs/zerolog/log"	
 	"github.com/joho/godotenv"
-	"github.com/go-auth0/internal/core"
+	"github.com/go-auth0/internal/model"
 )
 
-func GetDynamoEnv() core.DatabaseDynamo {
-	childLogger.Debug().Msg("GetDynamoEnv")
+func GetDynamoEnv() model.DatabaseDynamo {
+	log.Debug().Msg("GetDynamoEnv")
 
 	err := godotenv.Load(".env")
 	if err != nil {
-		childLogger.Info().Err(err).Msg("env file not found !!!")
+		log.Info().Err(err).Msg("env file not found !!!")
 	}
 	
-	var databaseDynamo	core.DatabaseDynamo
+	var databaseDynamo	model.DatabaseDynamo
 
 	if os.Getenv("USER_TABLE_NAME") !=  "" {
 		databaseDynamo.UserTableName = os.Getenv("USER_TABLE_NAME")
