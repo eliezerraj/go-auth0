@@ -19,4 +19,7 @@ var (
 	ErrQueryEmpty			= errors.New("query parameters missing")
 	ErrTokenStillValid		= errors.New("token is still valid")
 	ErrDecodeKey			= errors.New("error decode rsa key")
+	ErrCertRevoked			= errors.New("error cert revoke")
+	ErrParseCert			= errors.New("error parse cert")
+	ErrDecodeCert			= errors.New("error decode cert")
 )

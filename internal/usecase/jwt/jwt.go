@@ -28,12 +28,14 @@ type WorkerService struct {
 	awsClientSecretManager 	*aws_secret_manager.AwsClientSecretManager
 	workerDynamo			*repository.RepoWorker
 	rsaKey 					*model.RSA_Key
+	crl_pem					*string
 }
 
 func NewWorkerService(	ctx context.Context,
 						awsClientSecretManager *aws_secret_manager.AwsClientSecretManager, 
 						workerDynamo	*repository.RepoWorker,
-						rsaKey *model.RSA_Key ) (*WorkerService, error){
+						rsaKey *model.RSA_Key,
+						crl_pem	*string ) (*WorkerService, error){
 	childLogger.Debug().Msg("NewWorkerService")
 
 	res_secret, err := awsClientSecretManager.GetSecret(ctx, rsaKey.SecretNameH256)
@@ -63,6 +65,7 @@ func NewWorkerService(	ctx context.Context,
 		awsClientSecretManager: awsClientSecretManager,
 		workerDynamo: 	workerDynamo,
 		rsaKey:	rsaKey,
+		crl_pem: crl_pem,
 	}, nil
 }
 
@@ -104,6 +107,23 @@ func ParsePemToRSAPub(public_key *string) (*rsa.PublicKey, error){
 	key_rsa := pubInterface.(*rsa.PublicKey)
 
 	return key_rsa, nil
+}
+
+func ParsePemToCertx509(pemString *string) (*x509.Certificate, error) {
+    childLogger.Debug().Msg("ParsePemToCertx509")
+
+	block, _ := pem.Decode([]byte(*pemString))
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, erro.ErrDecodeCert
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+    if err != nil {
+		log.Error().Msg("Erro ParseCertificate !!!")
+        return nil, err
+    }
+
+	return cert, nil
 }
 
 func (w *WorkerService) OAUTHCredential(ctx context.Context, credential model.Credential) (*model.Authentication, error){
@@ -428,4 +448,79 @@ func (w *WorkerService) RefreshTokenRSA(ctx context.Context, credential model.Cr
 									ExpirationTime :expirationTime}
 
 	return &auth,nil
+}
+
+func (w *WorkerService) ValidCRLToken(ctx context.Context, cert model.Credential) (bool, error){
+	childLogger.Debug().Msg("ValidCRLToken")
+	childLogger.Debug().Msg("--------------------------------------")
+
+	span := observability.Span(ctx, "usecase.ValidCRLToken")
+	defer span.End()
+
+	res, err := w.VerifyCertCRL(ctx, cert.Cert)
+	if err != nil {
+		return false, err
+	}
+
+	return res, nil
+}
+
+func(w *WorkerService) VerifyCertCRL(	ctx context.Context, 
+										certX509PemEncoded string) (bool, error){
+	childLogger.Debug().Msg("VerifyCertCRL")
+
+	span := observability.Span(ctx, "useCase.VerifyCertCRL")	
+    defer span.End()
+
+	// The cert must be informed
+	if certX509PemEncoded == ""{
+		childLogger.Error().Msg("Client Cert no Informed !!!")
+		return false, erro.ErrCertRevoked
+	}
+
+	certX509PemDecoded, err := base64.StdEncoding.DecodeString(certX509PemEncoded)
+	if err != nil {
+		return false, err
+	}
+	certX509PemDecoded_str := string(certX509PemDecoded)
+	certX509, err := ParsePemToCertx509(&certX509PemDecoded_str)
+	if err != nil {
+		childLogger.Error().Err(err).Msg("Erro ParsePemToCertx509 !!!")
+		return false, erro.ErrParseCert
+	}
+
+	certSerialNumber := certX509.SerialNumber
+
+	childLogger.Debug().Interface("= 1 > certSerialNumber : ", certSerialNumber).Msg("")
+	childLogger.Debug().Interface("= 1 > crl_pem : ", *w.crl_pem).Msg("")
+
+	block, _ := pem.Decode([]byte(*w.crl_pem))
+	if block == nil || block.Type != "X509 CRL" {
+		childLogger.Error().Err(err).Msg("erro decode crl")
+		return false, err
+	}
+
+	crl, err := x509.ParseRevocationList(block.Bytes)
+	if err != nil {
+		childLogger.Error().Err(err).Msg("erro ParseRevocationList crl")
+		return false, err
+	}
+
+	fmt.Printf("Issuer: %s\n", crl.Issuer)
+	fmt.Printf("ThisUpdate: %s\n", crl.ThisUpdate)
+	fmt.Printf("NextUpdate: %s\n", crl.NextUpdate)
+	fmt.Printf("Number of Revoked Cert: %d\n", len(crl.RevokedCertificates))
+
+	// Iterate over revoked certificates
+	for i, revokedCert := range crl.RevokedCertificateEntries {
+		fmt.Printf("Revoked Certificate %d:\n", i+1)
+		fmt.Printf("Serial Number: %s\n", revokedCert.SerialNumber)
+		fmt.Printf("Revocation Time: %s\n", revokedCert.RevocationTime)
+		if revokedCert.SerialNumber.Cmp(certSerialNumber) == 0 {
+			return true, nil
+		}
+		return true, nil
+	}
+
+	return false, nil
 }

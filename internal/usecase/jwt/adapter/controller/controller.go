@@ -188,7 +188,7 @@ func (h *HttpWorkerAdapter) TokenValidation(rw http.ResponseWriter, req *http.Re
 func (h *HttpWorkerAdapter) RefreshToken(rw http.ResponseWriter, req *http.Request) error {
 	childLogger.Debug().Msg("RefreshToken")
 
-	span := observability.Span(req.Context(), "handler.RefreshToken")
+	span := observability.Span(req.Context(), "controller.RefreshToken")
 	defer span.End()
 
 	token := model.Credential{}
@@ -337,7 +337,7 @@ func (h *HttpWorkerAdapter) ValidationRSA(rw http.ResponseWriter, req *http.Requ
 func (h *HttpWorkerAdapter) TokenValidationRSA(rw http.ResponseWriter, req *http.Request) error {
 	childLogger.Debug().Msg("TokenValidationRSA")
 
-	span := observability.Span(req.Context(), "handler.TokenValidationRSA")
+	span := observability.Span(req.Context(), "controller.TokenValidationRSA")
 	defer span.End()
 
 	var token model.Credential
@@ -367,7 +367,7 @@ func (h *HttpWorkerAdapter) TokenValidationRSA(rw http.ResponseWriter, req *http
 func (h *HttpWorkerAdapter) ValidationTokenAndPubKey(rw http.ResponseWriter, req *http.Request) error {
 	childLogger.Debug().Msg("ValidationTokenAndPubKey")
 
-	span := observability.Span(req.Context(), "handler.ValidationTokenAndPubKey")
+	span := observability.Span(req.Context(), "controller.ValidationTokenAndPubKey")
 	defer span.End()
 
 	jwksData := model.JwksData{}
@@ -398,7 +398,7 @@ func (h *HttpWorkerAdapter) ValidationTokenAndPubKey(rw http.ResponseWriter, req
 func (h *HttpWorkerAdapter) RefreshTokenRSA(rw http.ResponseWriter, req *http.Request) error {
 	childLogger.Debug().Msg("RefreshTokenRSA")
 
-	span := observability.Span(req.Context(), "handler.RefreshTokenRSA")
+	span := observability.Span(req.Context(), "controller.RefreshTokenRSA")
 	defer span.End()
 
 	token := model.Credential{}
@@ -416,6 +416,37 @@ func (h *HttpWorkerAdapter) RefreshTokenRSA(rw http.ResponseWriter, req *http.Re
 		case erro.ErrTokenExpired:
 			apiError = NewAPIError(http.StatusUnauthorized, err)
 		case erro.ErrStatusUnauthorized:
+			apiError = NewAPIError(http.StatusUnauthorized, err)
+		default:
+			apiError = NewAPIError(http.StatusInternalServerError, err)
+		}
+		return apiError
+	}
+
+	return WriteJSON(rw, http.StatusOK, res)
+}
+
+func (h *HttpWorkerAdapter) ValidCRLToken(rw http.ResponseWriter, req *http.Request) error {
+	childLogger.Debug().Msg("ValidCRLToken")
+
+	span := observability.Span(req.Context(), "controller.ValidCRLToken")
+	defer span.End()
+
+	cert := model.Credential{}
+	err := json.NewDecoder(req.Body).Decode(&cert)
+    if err != nil {
+		apiError := NewAPIError(http.StatusBadRequest, erro.ErrUnmarshal)
+		return apiError
+    }
+	defer req.Body.Close()
+
+	res, err := h.usecase.ValidCRLToken(req.Context(), cert)
+	if err != nil {
+		var apiError APIError
+		switch err {
+		case erro.ErrParseCert:
+			apiError = NewAPIError(http.StatusUnauthorized, err)
+		case erro.ErrParseCert:
 			apiError = NewAPIError(http.StatusUnauthorized, err)
 		default:
 			apiError = NewAPIError(http.StatusInternalServerError, err)

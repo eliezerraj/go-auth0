@@ -66,7 +66,8 @@ func main() {
 	usecase, err := jwt.NewWorkerService(ctx,
 										clientSecretManager, 
 										repoWorker,
-										appServer.RSA_Key)
+										appServer.RSA_Key,
+										&appServer.RSA_Key.Crl_pem)
 	if err != nil {
 		log.Error().Err(err).Msg("erro NewWorkerService")
 		panic(err)

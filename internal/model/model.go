@@ -59,6 +59,7 @@ type Credential struct {
 	Password		string	`json:"password,omitempty"`
 	BasicAuth		string	`json:"basic_auth,omitempty"`
 	Token			string 	`json:"token,omitempty"`
+	Cert			string 	`json:"ca_cert,omitempty"`
 }
 
 type CredentialScope struct {
@@ -88,7 +89,8 @@ type RSA_Key struct{
 	SecretNameH256		string
 	JwtKey				string
 	Key_rsa_priv_pem	string
-	Key_rsa_pub_pem 	string	
+	Key_rsa_pub_pem 	string
+	Crl_pem 			string	
 	Key_rsa_priv 		*rsa.PrivateKey
 	Key_rsa_pub 		*rsa.PublicKey	
 }

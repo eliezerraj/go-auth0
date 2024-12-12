@@ -114,6 +114,11 @@ func (h HttpServer) StartHttpAppServer(	ctx context.Context,
 	refreshTokenRSA.Handle("/refresh_token_rsa",middleware.MiddleWareErrorHandler(httpWorkerAdapter.RefreshTokenRSA),)
 	refreshTokenRSA.Use(otelmux.Middleware("go-auth0"))
 
+
+	validCRLToken := myRouter.Methods(http.MethodPost, http.MethodOptions).Subrouter()
+	validCRLToken.Handle("/valid_crl_token",middleware.MiddleWareErrorHandler(httpWorkerAdapter.ValidCRLToken),)
+	validCRLToken.Use(otelmux.Middleware("go-auth0"))
+
 	// ---------------
 	srv := http.Server{
 		Addr:         ":" +  strconv.Itoa(h.httpServer.Port),      	
