@@ -34,7 +34,7 @@ type WorkerService struct {
 func NewWorkerService(	ctx context.Context,
 						awsClientSecretManager *aws_secret_manager.AwsClientSecretManager, 
 						workerDynamo	*repository.RepoWorker,
-						rsaKey *model.RSA_Key,
+						rsaKey 	*model.RSA_Key,
 						crl_pem	*string ) (*WorkerService, error){
 	childLogger.Debug().Msg("NewWorkerService")
 
@@ -51,11 +51,11 @@ func NewWorkerService(	ctx context.Context,
 
 	_key_rsa_priv, err := ParsePemToRSAPriv(&rsaKey.Key_rsa_priv_pem)
 	if err != nil{
-		childLogger.Error().Err(err).Msg("erro ParsePemToRSA !!!!")
+		childLogger.Error().Err(err).Msg("erro Private ParsePemToRSA !!!!")
 	}
 	_key_rsa_pub, err := ParsePemToRSAPub(&rsaKey.Key_rsa_pub_pem)
 	if err != nil{
-		childLogger.Error().Err(err).Msg("erro ParsePemToRSA !!!!")
+		childLogger.Error().Err(err).Msg("erro Public ParsePemToRSA !!!!")
 	}
 
 	rsaKey.Key_rsa_priv = _key_rsa_priv
@@ -70,11 +70,13 @@ func NewWorkerService(	ctx context.Context,
 }
 
 func ParsePemToRSAPriv(private_key *string) (*rsa.PrivateKey, error){
-	childLogger.Debug().Msg("ParsePemToRSA")
+	childLogger.Debug().Msg("ParsePemToRSAPriv")
+
+	log.Debug().Interface("====>>> private_key :",private_key).Msg("")
 
 	block, _ := pem.Decode([]byte(*private_key))
 	if block == nil || block.Type != "PRIVATE KEY" {
-		childLogger.Error().Err(erro.ErrDecodeKey).Msg("erro Decode")
+		childLogger.Error().Err(erro.ErrDecodeKey).Msg("erro PRIVATE KEY Decode")
 		return nil, erro.ErrDecodeKey
 	}
 
@@ -90,11 +92,12 @@ func ParsePemToRSAPriv(private_key *string) (*rsa.PrivateKey, error){
 }
 
 func ParsePemToRSAPub(public_key *string) (*rsa.PublicKey, error){
-	childLogger.Debug().Msg("ParsePemToRSA")
+	childLogger.Debug().Msg("ParsePemToRSAPub")
+	log.Debug().Interface("====>>> public_key :",public_key).Msg("")
 
 	block, _ := pem.Decode([]byte(*public_key))
 	if block == nil || block.Type != "PUBLIC KEY" {
-		childLogger.Error().Err(erro.ErrDecodeKey).Msg("erro Decode")
+		childLogger.Error().Err(erro.ErrDecodeKey).Msg("erro PUBLIC KEY Decode")
 		return nil, erro.ErrDecodeKey
 	}
 

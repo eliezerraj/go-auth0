@@ -23,19 +23,19 @@ func LoadRSAKey() (*model.RSA_Key){
 	}
 
 	// Load Private key
-	private_key, err := os.ReadFile("../cmd/vault/server-private.key")
+	private_key, err := os.ReadFile("../assets/certs/server-private.key")
 	if err != nil {
 		log.Error().Err(err).Msg("erro ReadFile - private_key")
 		return nil
 	}
 
-	public_key, err := os.ReadFile("../cmd/vault/server-public.key")
+	public_key, err := os.ReadFile("../assets/certs/server-public.key")
 	if err != nil {
 		log.Error().Err(err).Msg("erro ReadFile - public_key")
 		return nil
 	}
 
-	crl_pem, err := os.ReadFile("../cmd/vault/crl-ca.crl")
+	crl_pem, err := os.ReadFile("../assets/certs/crl-ca.crl")
 	if err != nil {
 		log.Error().Err(err).Msg("erro ReadFile - crl_ca.crl")
 		return nil
